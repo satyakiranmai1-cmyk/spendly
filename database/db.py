@@ -22,6 +22,9 @@ def init_db():
             name TEXT NOT NULL,
             email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
+            username TEXT,
+            status TEXT NOT NULL DEFAULT 'active',
+            environment TEXT NOT NULL DEFAULT 'production',
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
@@ -37,8 +40,30 @@ def init_db():
         );
         """
     )
+    _migrate_users_table(conn)
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users (username)")
     conn.commit()
     conn.close()
+
+
+def _migrate_users_table(conn):
+    """Add columns introduced after the original users table to pre-existing databases."""
+    existing_columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
+    added_columns = {
+        "username": "ALTER TABLE users ADD COLUMN username TEXT",
+        "status": "ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'",
+        "environment": "ALTER TABLE users ADD COLUMN environment TEXT NOT NULL DEFAULT 'production'",
+    }
+    for column, statement in added_columns.items():
+        if column not in existing_columns:
+            conn.execute(statement)
+
+
+def get_user_by_email(email):
+    conn = get_db()
+    row = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
+    conn.close()
+    return row
 
 
 def seed_db():
