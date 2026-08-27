@@ -1,5 +1,5 @@
 ep-number> <feature-name>
-
+Step 1: Run 'git status' and check for uncommitted, untracked and unstaged files.  If any exist, stop immediately and tell user to commit the changes before proceeding. do not continue until the working directory is clean.
 Command Inputs
 
 Step Number: Sequential implementation number for the feature.
@@ -15,6 +15,14 @@ Feature Specification Template
 For every /next-feature request, prepare the following sections:
 
 Step Number
+Run 'git branch' to list existing branches .  If branch_name is already taken, append a number 'feature/registration-01,'feature/registration-02' et
+
+Run:
+git checkout main
+git pull origin main
+
+Run:
+git checkout -b <branch_name>
 
 <step-number>
 
