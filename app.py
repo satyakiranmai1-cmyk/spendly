@@ -1,12 +1,32 @@
-from flask import Flask, render_template
+import os
+import re
+import sqlite3
+from functools import wraps
 
-from database.db import get_db, init_db, seed_db
+from flask import Flask, redirect, render_template, request, session, url_for
+from werkzeug.security import generate_password_hash
+
+from database.db import create_user, get_db, get_user_by_email, get_user_by_id, init_db, seed_db
 
 app = Flask(__name__)
+# WARNING: fallback is for local dev only — always set FLASK_SECRET_KEY in any real deployment.
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-only-insecure-secret-key-change-me")
 
 with app.app_context():
     init_db()
     seed_db()
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def login_required(view_func):
+    @wraps(view_func)
+    def wrapped_view(*args, **kwargs):
+        if not session.get("user_id"):
+            return redirect(url_for("login"))
+        return view_func(*args, **kwargs)
+
+    return wrapped_view
 
 
 # ------------------------------------------------------------------ #
@@ -18,9 +38,42 @@ def landing():
     return render_template("landing.html")
 
 
-@app.route("/register")
+@app.route("/register", methods=["GET", "POST"])
 def register():
-    return render_template("register.html")
+    if request.method == "GET":
+        return render_template("register.html")
+
+    name = request.form.get("name", "").strip()
+    email = request.form.get("email", "").strip()
+    password = request.form.get("password", "")
+
+    if not name:
+        error = "Please enter your full name."
+    elif not EMAIL_RE.match(email):
+        error = "Please enter a valid email address."
+    elif len(password) < 8:
+        error = "Password must be at least 8 characters long."
+    elif get_user_by_email(email) is not None:
+        error = "That email is already in use."
+    else:
+        error = None
+
+    if error:
+        return render_template("register.html", error=error, name=name, email=email)
+
+    password_hash = generate_password_hash(password)
+    try:
+        user_id = create_user(name, email, password_hash)
+    except sqlite3.IntegrityError:
+        return render_template(
+            "register.html",
+            error="That email is already in use.",
+            name=name,
+            email=email,
+        )
+
+    session["user_id"] = user_id
+    return redirect(url_for("profile"))
 
 
 @app.route("/login")
@@ -38,8 +91,13 @@ def logout():
 
 
 @app.route("/profile")
+@login_required
 def profile():
-    return "Profile page — coming in Step 4"
+    user = get_user_by_id(session["user_id"])
+    if user is None:
+        session.pop("user_id", None)
+        return redirect(url_for("login"))
+    return render_template("profile.html", user=user)
 
 
 @app.route("/expenses/add")
