@@ -1,12 +1,21 @@
 import os
 import re
 import sqlite3
+from datetime import datetime
 from functools import wraps
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from database.db import create_user, get_db, get_user_by_email, get_user_by_id, init_db, seed_db
+from database.db import (
+    create_user,
+    get_db,
+    get_expense_summary_by_user,
+    get_user_by_email,
+    get_user_by_id,
+    init_db,
+    seed_db,
+)
 
 app = Flask(__name__)
 # WARNING: fallback is for local dev only — always set FLASK_SECRET_KEY in any real deployment.
@@ -113,7 +122,18 @@ def profile():
     if user is None:
         session.pop("user_id", None)
         return redirect(url_for("login"))
-    return render_template("profile.html", user=user)
+    summary = get_expense_summary_by_user(user["id"])
+    member_since = None
+    if user["created_at"]:
+        try:
+            member_since = datetime.strptime(user["created_at"], "%Y-%m-%d %H:%M:%S").strftime(
+                "%B %d, %Y"
+            )
+        except ValueError:
+            member_since = user["created_at"]
+    return render_template(
+        "profile.html", user=user, summary=summary, member_since=member_since
+    )
 
 
 @app.route("/expenses/add")
