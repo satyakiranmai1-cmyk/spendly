@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import date_range_filter, expense_day_list %}
 
 {% block title %}Your profile — Spendly{% endblock %}
 
@@ -30,6 +31,19 @@
             </div>
         </div>
 
+        {{ date_range_filter(url_for('profile'), filter_start, filter_end, presets, active_preset) }}
+
+        <p class="date-filter-summary">
+            {{ summary.expense_count }} expense{{ "s" if summary.expense_count != 1 else "" }}
+            &middot; ${{ "%.2f"|format(summary.total_spent) }} total
+            &middot;
+            {% if filter_start and filter_end %}
+                {{ filter_start.strftime('%b %d, %Y') }}–{{ filter_end.strftime('%b %d, %Y') }}
+            {% else %}
+                All time
+            {% endif %}
+        </p>
+
         <div class="stats-row">
             <div class="stat-tile">
                 <span class="mock-label">Total spent</span>
@@ -41,8 +55,11 @@
             </div>
         </div>
 
+        {% set empty_msg %}{% if filter_start and filter_end %}No expenses between {{ filter_start.strftime('%b %d, %Y') }} and {{ filter_end.strftime('%b %d, %Y') }}.{% else %}No expenses logged yet.{% endif %}{% endset %}
+        {{ expense_day_list(days, empty_msg) }}
+
         <a href="{{ url_for('expenses_statement') }}" class="btn-submit statement-link">
-            View day-wise statement
+            View full all-time statement
         </a>
 
     </div>

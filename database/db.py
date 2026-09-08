@@ -73,37 +73,62 @@ def get_user_by_id(user_id):
     return row
 
 
-def get_expense_summary_by_user(user_id):
+def get_expense_summary_by_user(user_id, start_date=None, end_date=None):
     conn = get_db()
-    row = conn.execute(
-        """
-        SELECT COALESCE(SUM(amount), 0) AS total_spent,
-               COUNT(*) AS expense_count
-        FROM expenses
-        WHERE user_id = ?
-        """,
-        (user_id,),
-    ).fetchone()
+    if start_date is not None and end_date is not None:
+        row = conn.execute(
+            """
+            SELECT COALESCE(SUM(amount), 0) AS total_spent,
+                   COUNT(*) AS expense_count
+            FROM expenses
+            WHERE user_id = ? AND date BETWEEN ? AND ?
+            """,
+            (user_id, start_date, end_date),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            """
+            SELECT COALESCE(SUM(amount), 0) AS total_spent,
+                   COUNT(*) AS expense_count
+            FROM expenses
+            WHERE user_id = ?
+            """,
+            (user_id,),
+        ).fetchone()
     conn.close()
     return {"total_spent": float(row["total_spent"]), "expense_count": int(row["expense_count"])}
 
 
-def get_expenses_by_day(user_id):
+def get_expenses_by_day(user_id, start_date=None, end_date=None):
     """Return the user's expenses grouped by day, most recent day first.
 
     Each group is {"date": "YYYY-MM-DD", "total": float, "expenses": [row, ...]},
     with expenses inside a day ordered most recent first.
+
+    When start_date and end_date (both "YYYY-MM-DD") are given, only expenses
+    in that inclusive range are returned.
     """
     conn = get_db()
-    rows = conn.execute(
-        """
-        SELECT id, amount, category, description, date
-        FROM expenses
-        WHERE user_id = ?
-        ORDER BY date DESC, id DESC
-        """,
-        (user_id,),
-    ).fetchall()
+    if start_date is not None and end_date is not None:
+        rows = conn.execute(
+            """
+            SELECT id, amount, category, description, date
+            FROM expenses
+            WHERE user_id = ? AND date BETWEEN ? AND ?
+            ORDER BY date DESC, id DESC
+            """,
+            (user_id, start_date, end_date),
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            """
+            SELECT id, amount, category, description, date
+            FROM expenses
+            WHERE user_id = ?
+            ORDER BY date DESC, id DESC
+            """,
+            (user_id,),
+        ).fetchall()
     conn.close()
 
     days = []

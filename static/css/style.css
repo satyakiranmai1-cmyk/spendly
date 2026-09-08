@@ -546,6 +546,84 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ------------------------------------------------------------------ */
+/* Date range filter                                                   */
+/* ------------------------------------------------------------------ */
+
+.date-filter {
+    background: var(--paper-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+}
+
+.date-filter-form {
+    display: flex;
+    align-items: flex-end;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.date-filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.date-filter-field label {
+    font-size: 0.8rem;
+    color: var(--ink-muted);
+}
+
+.date-filter-field input[type="date"] {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 0.65rem;
+    font-size: 0.9rem;
+    color: var(--ink);
+    background: var(--paper);
+}
+
+.date-filter-submit {
+    padding: 0.55rem 1.25rem;
+}
+
+.date-filter-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+}
+
+.date-filter-preset {
+    display: inline-block;
+    padding: 0.4rem 0.85rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    color: var(--ink-muted);
+    font-size: 0.8rem;
+    text-decoration: none;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.date-filter-preset:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.date-filter-preset.is-active {
+    background: var(--accent-light);
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.date-filter-summary {
+    font-size: 0.9rem;
+    color: var(--ink-muted);
+    margin-bottom: 1.5rem;
+}
+
+/* ------------------------------------------------------------------ */
 /* Expense statement page                                              */
 /* ------------------------------------------------------------------ */
 
@@ -702,4 +780,5 @@ a { color: inherit; text-decoration: none; }
     .hero { padding: 3rem 1rem 2rem; }
     .stats-row { grid-template-columns: 1fr; }
     .profile-header { flex-direction: column; text-align: center; }
+    .date-filter-form { flex-direction: column; align-items: stretch; }
 }

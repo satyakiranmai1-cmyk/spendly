@@ -56,7 +56,7 @@ def test_profile_shows_correct_totals_for_seeded_demo_user(client):
     db_module.seed_db()
 
     client.post("/login", data={"email": "demo@spendly.com", "password": "demo123"})
-    resp = client.get("/profile")
+    resp = client.get("/profile?range=all")
 
     assert resp.status_code == 200
     assert b"$375.14" in resp.data

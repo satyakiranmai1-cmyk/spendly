@@ -1,7 +1,8 @@
+import calendar
 import os
 import re
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from functools import wraps
 
 from flask import Flask, redirect, render_template, request, session, url_for
@@ -27,6 +28,42 @@ with app.app_context():
     seed_db()
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def _parse_date_param(value):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def _current_month_range(today):
+    start = today.replace(day=1)
+    last_day = calendar.monthrange(today.year, today.month)[1]
+    end = date(today.year, today.month, last_day)
+    return start, end
+
+
+def _build_date_presets(today):
+    month_start, month_end = _current_month_range(today)
+    return [
+        {"key": "this_month", "label": "This month", "start": month_start, "end": month_end},
+        {"key": "last_30", "label": "Last 30 days", "start": today - timedelta(days=29), "end": today},
+        {"key": "last_6_months", "label": "Last 6 months", "start": today - timedelta(days=181), "end": today},
+        {"key": "all", "label": "All time", "start": None, "end": None},
+    ]
+
+
+def _attach_display_dates(days):
+    for day in days:
+        try:
+            day["display_date"] = datetime.strptime(day["date"], "%Y-%m-%d").strftime(
+                "%A, %B %d, %Y"
+            )
+        except ValueError:
+            day["display_date"] = day["date"]
 
 
 def login_required(view_func):
@@ -121,13 +158,7 @@ def expenses_statement():
         return redirect(url_for("login"))
 
     days = get_expenses_by_day(user["id"])
-    for day in days:
-        try:
-            day["display_date"] = datetime.strptime(day["date"], "%Y-%m-%d").strftime(
-                "%A, %B %d, %Y"
-            )
-        except ValueError:
-            day["display_date"] = day["date"]
+    _attach_display_dates(days)
 
     summary = get_expense_summary_by_user(user["id"])
     return render_template("expenses.html", days=days, summary=summary)
@@ -144,7 +175,44 @@ def profile():
     if user is None:
         session.pop("user_id", None)
         return redirect(url_for("login"))
-    summary = get_expense_summary_by_user(user["id"])
+
+    today = date.today()
+    presets = _build_date_presets(today)
+    month_start, month_end = _current_month_range(today)
+
+    if request.args.get("range") == "all":
+        start_date, end_date = None, None
+    else:
+        raw_start = request.args.get("start_date", "")
+        raw_end = request.args.get("end_date", "")
+        parsed_start = _parse_date_param(raw_start)
+        parsed_end = _parse_date_param(raw_end)
+        if not raw_start and not raw_end:
+            start_date, end_date = month_start, month_end
+        elif parsed_start and parsed_end and parsed_start <= parsed_end:
+            start_date, end_date = parsed_start, parsed_end
+        else:
+            start_date, end_date = month_start, month_end
+
+    db_start = start_date.isoformat() if start_date else None
+    db_end = end_date.isoformat() if end_date else None
+
+    summary = get_expense_summary_by_user(user["id"], db_start, db_end)
+    days = get_expenses_by_day(user["id"], db_start, db_end)
+    _attach_display_dates(days)
+
+    for preset in presets:
+        if preset["key"] == "all":
+            preset["href"] = url_for("profile", range="all")
+        else:
+            preset["href"] = url_for(
+                "profile", start_date=preset["start"].isoformat(), end_date=preset["end"].isoformat()
+            )
+
+    active_preset = next(
+        (p["key"] for p in presets if p["start"] == start_date and p["end"] == end_date), None
+    )
+
     member_since = None
     if user["created_at"]:
         try:
@@ -154,7 +222,15 @@ def profile():
         except ValueError:
             member_since = user["created_at"]
     return render_template(
-        "profile.html", user=user, summary=summary, member_since=member_since
+        "profile.html",
+        user=user,
+        summary=summary,
+        member_since=member_since,
+        days=days,
+        filter_start=start_date,
+        filter_end=end_date,
+        presets=presets,
+        active_preset=active_preset,
     )
 
 

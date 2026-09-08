@@ -1,0 +1,55 @@
+{% macro date_range_filter(action_url, filter_start, filter_end, presets, active_preset) %}
+<div class="date-filter">
+    <form class="date-filter-form" method="get" action="{{ action_url }}">
+        <div class="date-filter-field">
+            <label for="start_date">From</label>
+            <input type="date" id="start_date" name="start_date"
+                   value="{{ filter_start.isoformat() if filter_start else '' }}">
+        </div>
+        <div class="date-filter-field">
+            <label for="end_date">To</label>
+            <input type="date" id="end_date" name="end_date"
+                   value="{{ filter_end.isoformat() if filter_end else '' }}">
+        </div>
+        <button type="submit" class="btn-submit date-filter-submit">Apply</button>
+    </form>
+    <div class="date-filter-presets">
+        {% for preset in presets %}
+        <a href="{{ preset.href }}"
+           class="date-filter-preset{{ ' is-active' if preset.key == active_preset else '' }}">
+            {{ preset.label }}
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endmacro %}
+
+{% macro expense_day_list(days, empty_message) %}
+{% if days %}
+    {% for day in days %}
+    <div class="statement-day">
+        <div class="statement-day-header">
+            <span class="statement-date">{{ day.display_date }}</span>
+            <span class="statement-day-total">${{ "%.2f"|format(day.total) }}</span>
+        </div>
+        <ul class="statement-list">
+            {% for expense in day.expenses %}
+            <li class="statement-row">
+                <div class="statement-row-main">
+                    <span class="statement-category">{{ expense.category }}</span>
+                    {% if expense.description %}
+                    <span class="statement-desc">{{ expense.description }}</span>
+                    {% endif %}
+                </div>
+                <span class="statement-amount">${{ "%.2f"|format(expense.amount) }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="statement-empty">
+        <p>{{ empty_message }}</p>
+    </div>
+{% endif %}
+{% endmacro %}
