@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Your statement — Spendly{% endblock %}
+
+{% block content %}
+
+<section class="auth-section statement-section">
+    <div class="statement-container">
+
+        <div class="statement-header">
+            <h1 class="statement-title">Your statement</h1>
+            <p class="statement-subtitle">
+                {{ summary.expense_count }} expense{{ "s" if summary.expense_count != 1 else "" }}
+                &middot; ${{ "%.2f"|format(summary.total_spent) }} total
+            </p>
+        </div>
+
+        {% if days %}
+            {% for day in days %}
+            <div class="statement-day">
+                <div class="statement-day-header">
+                    <span class="statement-date">{{ day.display_date }}</span>
+                    <span class="statement-day-total">${{ "%.2f"|format(day.total) }}</span>
+                </div>
+                <ul class="statement-list">
+                    {% for expense in day.expenses %}
+                    <li class="statement-row">
+                        <div class="statement-row-main">
+                            <span class="statement-category">{{ expense.category }}</span>
+                            {% if expense.description %}
+                            <span class="statement-desc">{{ expense.description }}</span>
+                            {% endif %}
+                        </div>
+                        <span class="statement-amount">${{ "%.2f"|format(expense.amount) }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="statement-empty">
+                <p>No expenses logged yet.</p>
+            </div>
+        {% endif %}
+
+    </div>
+</section>
+
+{% endblock %}
