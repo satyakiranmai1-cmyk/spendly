@@ -73,6 +73,50 @@ def get_user_by_id(user_id):
     return row
 
 
+def get_expense_summary_by_user(user_id):
+    conn = get_db()
+    row = conn.execute(
+        """
+        SELECT COALESCE(SUM(amount), 0) AS total_spent,
+               COUNT(*) AS expense_count
+        FROM expenses
+        WHERE user_id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    return {"total_spent": float(row["total_spent"]), "expense_count": int(row["expense_count"])}
+
+
+def get_expenses_by_day(user_id):
+    """Return the user's expenses grouped by day, most recent day first.
+
+    Each group is {"date": "YYYY-MM-DD", "total": float, "expenses": [row, ...]},
+    with expenses inside a day ordered most recent first.
+    """
+    conn = get_db()
+    rows = conn.execute(
+        """
+        SELECT id, amount, category, description, date
+        FROM expenses
+        WHERE user_id = ?
+        ORDER BY date DESC, id DESC
+        """,
+        (user_id,),
+    ).fetchall()
+    conn.close()
+
+    days = []
+    current_day = None
+    for row in rows:
+        if current_day is None or row["date"] != current_day["date"]:
+            current_day = {"date": row["date"], "total": 0.0, "expenses": []}
+            days.append(current_day)
+        current_day["expenses"].append(dict(row))
+        current_day["total"] += row["amount"]
+    return days
+
+
 def create_user(name, email, password_hash):
     conn = get_db()
     try:

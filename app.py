@@ -1,12 +1,22 @@
 import os
 import re
 import sqlite3
+from datetime import datetime
 from functools import wraps
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
-from database.db import create_user, get_db, get_user_by_email, get_user_by_id, init_db, seed_db
+from database.db import (
+    create_user,
+    get_db,
+    get_expense_summary_by_user,
+    get_expenses_by_day,
+    get_user_by_email,
+    get_user_by_id,
+    init_db,
+    seed_db,
+)
 
 app = Flask(__name__)
 # WARNING: fallback is for local dev only — always set FLASK_SECRET_KEY in any real deployment.
@@ -102,6 +112,27 @@ def logout():
     return redirect(url_for("landing"))
 
 
+@app.route("/expenses")
+@login_required
+def expenses_statement():
+    user = get_user_by_id(session["user_id"])
+    if user is None:
+        session.pop("user_id", None)
+        return redirect(url_for("login"))
+
+    days = get_expenses_by_day(user["id"])
+    for day in days:
+        try:
+            day["display_date"] = datetime.strptime(day["date"], "%Y-%m-%d").strftime(
+                "%A, %B %d, %Y"
+            )
+        except ValueError:
+            day["display_date"] = day["date"]
+
+    summary = get_expense_summary_by_user(user["id"])
+    return render_template("expenses.html", days=days, summary=summary)
+
+
 # ------------------------------------------------------------------ #
 # Placeholder routes — students will implement these                  #
 # ------------------------------------------------------------------ #
@@ -113,7 +144,18 @@ def profile():
     if user is None:
         session.pop("user_id", None)
         return redirect(url_for("login"))
-    return render_template("profile.html", user=user)
+    summary = get_expense_summary_by_user(user["id"])
+    member_since = None
+    if user["created_at"]:
+        try:
+            member_since = datetime.strptime(user["created_at"], "%Y-%m-%d %H:%M:%S").strftime(
+                "%B %d, %Y"
+            )
+        except ValueError:
+            member_since = user["created_at"]
+    return render_template(
+        "profile.html", user=user, summary=summary, member_since=member_since
+    )
 
 
 @app.route("/expenses/add")
