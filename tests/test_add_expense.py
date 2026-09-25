@@ -89,6 +89,31 @@ def test_valid_post_inserts_expense_and_flashes(client):
     assert "Expense added." in client.get("/profile").get_data(as_text=True)
 
 
+def test_profile_totals_include_added_expenses(client):
+    register(client)
+    resp = client.get("/profile")
+    assert b"$0.00" in resp.data
+    assert b'mock-total">0</span>' in resp.data
+
+    client.post("/expenses/add", data=valid_form(amount="42.50"))
+    client.post("/expenses/add", data=valid_form(amount="7.25", category="Transport"))
+
+    resp = client.get("/profile")
+    assert b"$49.75" in resp.data
+    assert b'mock-total">2</span>' in resp.data
+
+
+def test_profile_totals_only_count_own_expenses(client):
+    register(client, email="other@example.com")
+    client.post("/expenses/add", data=valid_form(amount="100"))
+    with client.session_transaction() as sess:
+        sess.clear()
+    register(client, email="ada@example.com")
+
+    resp = client.get("/profile")
+    assert b"$0.00" in resp.data
+
+
 def test_trailing_zero_decimals_are_accepted(client):
     register(client)
     resp = client.post("/expenses/add", data=valid_form(amount="5.500"))

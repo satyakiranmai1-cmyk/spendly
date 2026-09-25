@@ -12,6 +12,7 @@ from database.db import (
     create_expense,
     create_user,
     get_db,
+    get_expense_summary_by_user,
     get_user_by_email,
     get_user_by_id,
     init_db,
@@ -169,7 +170,8 @@ def profile():
     if user is None:
         session.pop("user_id", None)
         return redirect(url_for("login"))
-    return render_template("profile.html", user=user)
+    summary = get_expense_summary_by_user(user["id"])
+    return render_template("profile.html", user=user, summary=summary)
 
 
 @app.route("/expenses/add", methods=["GET", "POST"])

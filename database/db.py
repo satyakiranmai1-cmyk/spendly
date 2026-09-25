@@ -73,6 +73,21 @@ def get_user_by_id(user_id):
     return row
 
 
+def get_expense_summary_by_user(user_id):
+    conn = get_db()
+    row = conn.execute(
+        """
+        SELECT COALESCE(SUM(amount), 0) AS total_spent,
+               COUNT(*) AS expense_count
+        FROM expenses
+        WHERE user_id = ?
+        """,
+        (user_id,),
+    ).fetchone()
+    conn.close()
+    return {"total_spent": float(row["total_spent"]), "expense_count": int(row["expense_count"])}
+
+
 def create_user(name, email, password_hash):
     conn = get_db()
     try:
