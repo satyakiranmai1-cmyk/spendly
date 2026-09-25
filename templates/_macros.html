@@ -1,0 +1,29 @@
+{% macro expense_day_list(days, empty_message) %}
+{% if days %}
+    {% for day in days %}
+    <div class="statement-day">
+        <div class="statement-day-header">
+            <span class="statement-date">{{ day.display_date }}</span>
+            <span class="statement-day-total">${{ "%.2f"|format(day.total) }}</span>
+        </div>
+        <ul class="statement-list">
+            {% for expense in day.expenses %}
+            <li class="statement-row">
+                <div class="statement-row-main">
+                    <span class="statement-category">{{ expense.category }}</span>
+                    {% if expense.description %}
+                    <span class="statement-desc">{{ expense.description }}</span>
+                    {% endif %}
+                </div>
+                <span class="statement-amount">${{ "%.2f"|format(expense.amount) }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endfor %}
+{% else %}
+    <div class="statement-empty">
+        <p>{{ empty_message }}</p>
+    </div>
+{% endif %}
+{% endmacro %}

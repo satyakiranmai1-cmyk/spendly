@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import expense_day_list %}
 
 {% block title %}Your profile — Spendly{% endblock %}
 
@@ -22,6 +23,24 @@
                 <p>{{ user.email }}</p>
             </div>
         </div>
+
+        <div class="stats-row">
+            <div class="stat-tile">
+                <span class="mock-label">Total spent</span>
+                <span class="mock-total">${{ "%.2f"|format(summary.total_spent) }}</span>
+            </div>
+            <div class="stat-tile">
+                <span class="mock-label">Expenses logged</span>
+                <span class="mock-total">{{ summary.expense_count }}</span>
+            </div>
+        </div>
+
+        <div class="transactions-header">
+            <h2 class="transactions-title">Transactions</h2>
+            <a href="{{ url_for('add_expense') }}" class="btn-primary">Add expense</a>
+        </div>
+
+        {{ expense_day_list(days, "No expenses logged yet.") }}
 
     </div>
 </section>
