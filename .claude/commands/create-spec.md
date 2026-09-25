@@ -5,7 +5,7 @@ Command Inputs
 Step Number: Sequential implementation number for the feature.
 
 Feature Name: Short, clear name of the feature to be prepared.
-
+//
 Example
 
 /next-feature 03 Monthly Expense Summary
