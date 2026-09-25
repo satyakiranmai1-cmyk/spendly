@@ -144,3 +144,114 @@ def test_nav_shows_signed_in_links_when_authenticated(client):
     assert b"Profile" in resp.data
     assert b"Sign out" in resp.data
     assert b"Get started" not in resp.data
+
+
+# ------------------------------------------------------------------ #
+# Coverage added from .claude/specs/03-login-and-logout.md           #
+# ------------------------------------------------------------------ #
+
+
+def test_successful_login_for_seeded_dummy_user(client, monkeypatch):
+    from database import seed_dummy_user as seed_module
+
+    monkeypatch.delenv("DUMMY_USER_PASSWORD", raising=False)
+    seed_module.seed_dummy_user()
+
+    resp = client.post(
+        "/login",
+        data={"email": seed_module.DUMMY_EMAIL, "password": seed_module.DEFAULT_DUMMY_PASSWORD},
+    )
+
+    assert resp.status_code == 302
+    assert resp.headers["Location"] == "/profile"
+    user = db_module.get_user_by_email(seed_module.DUMMY_EMAIL)
+    with client.session_transaction() as sess:
+        assert sess["user_id"] == user["id"]
+
+
+def test_unknown_email_and_wrong_password_render_identical_pages(client):
+    register(client, email="ada@example.com", password="supersecret")
+    with client.session_transaction() as sess:
+        sess.clear()
+
+    wrong_password = client.post(
+        "/login", data={"email": "ada@example.com", "password": "wrongpass"}
+    ).get_data(as_text=True)
+    unknown_email = client.post(
+        "/login", data={"email": "zed@example.com", "password": "wrongpass"}
+    ).get_data(as_text=True)
+
+    # Only the echoed email may differ; nothing else can hint which case occurred.
+    assert wrong_password.replace("ada@example.com", "EMAIL") == unknown_email.replace(
+        "zed@example.com", "EMAIL"
+    )
+
+
+def test_unknown_email_is_preserved_on_failed_login(client):
+    resp = client.post("/login", data={"email": "nobody@example.com", "password": "whatever1"})
+
+    assert b'value="nobody@example.com"' in resp.data
+
+
+def test_password_is_never_echoed_on_failed_login(client):
+    register(client, email="ada@example.com", password="supersecret")
+    with client.session_transaction() as sess:
+        sess.clear()
+
+    resp = client.post(
+        "/login", data={"email": "ada@example.com", "password": "Wr0ngPassw0rd!"}
+    )
+
+    assert b"Wr0ngPassw0rd!" not in resp.data
+
+
+def test_password_is_stored_only_as_a_hash(client):
+    register(client, email="ada@example.com", password="supersecret")
+
+    user = db_module.get_user_by_email("ada@example.com")
+
+    assert user["password_hash"] != "supersecret"
+    assert "supersecret" not in user["password_hash"]
+
+
+def test_login_does_not_write_to_the_database(client):
+    register(client, email="ada@example.com", password="supersecret")
+    with client.session_transaction() as sess:
+        sess.clear()
+    before = dict(db_module.get_user_by_email("ada@example.com"))
+
+    client.post("/login", data={"email": "ada@example.com", "password": "supersecret"})
+    client.post("/login", data={"email": "ada@example.com", "password": "wrongpass"})
+
+    conn = db_module.get_db()
+    user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    conn.close()
+    assert user_count == 1
+    assert dict(db_module.get_user_by_email("ada@example.com")) == before
+
+
+def test_logout_when_signed_out_redirects_to_landing(client):
+    resp = client.get("/logout")
+
+    assert resp.status_code == 302
+    assert resp.headers["Location"] == "/"
+
+
+@pytest.mark.parametrize("path", ["/", "/login", "/register"])
+def test_nav_shows_signed_out_links_on_public_pages(client, path):
+    body = client.get(path).get_data(as_text=True)
+
+    assert 'href="/login"' in body
+    assert 'href="/register"' in body
+    assert 'href="/logout"' not in body
+
+
+@pytest.mark.parametrize("path", ["/", "/login", "/register", "/profile"])
+def test_nav_shows_signed_in_links_on_every_page(client, path):
+    register(client, email="ada@example.com", password="supersecret")
+
+    body = client.get(path).get_data(as_text=True)
+
+    assert 'href="/profile"' in body
+    assert 'href="/logout"' in body
+    assert "Get started" not in body

@@ -1,3 +1,4 @@
+import re
 from datetime import date, timedelta
 
 import pytest
@@ -37,6 +38,10 @@ def valid_form(**overrides):
     }
     form.update(overrides)
     return form
+
+
+def date_input(body):
+    return re.search(r'<input type="date"[^>]*>', body).group(0)
 
 
 def expense_rows():
@@ -177,7 +182,7 @@ def test_blank_description_is_stored_as_null(client):
         {"date": ""},
         {"date": "2026-02-30"},
         {"date": "25/09/2026"},
-        {"date": (date.today() + timedelta(days=1)).isoformat()},
+        {"date": (date.today() + timedelta(days=2)).isoformat()},
         {"description": "x" * 201},
     ],
 )
@@ -217,3 +222,146 @@ def test_deleted_user_session_redirects_to_login(client):
     assert expense_rows() == []
     with client.session_transaction() as sess:
         assert "user_id" not in sess
+
+
+# ------------------------------------------------------------------ #
+# Coverage added from .claude/specs/06-add-expenses.md               #
+# ------------------------------------------------------------------ #
+
+
+@pytest.mark.parametrize(
+    "amount, stored",
+    [("0.01", 0.01), ("10000000", 10000000.0), ("10000000.00", 10000000.0), ("19.99", 19.99)],
+)
+def test_amounts_at_the_limits_are_accepted(client, amount, stored):
+    register(client)
+
+    resp = client.post("/expenses/add", data=valid_form(amount=amount))
+
+    assert resp.status_code == 302
+    assert expense_rows()[0]["amount"] == stored
+
+
+def test_description_of_exactly_200_characters_is_accepted(client):
+    register(client)
+
+    resp = client.post("/expenses/add", data=valid_form(description="x" * 200))
+
+    assert resp.status_code == 302
+    assert expense_rows()[0]["description"] == "x" * 200
+
+
+def test_description_is_stored_trimmed(client):
+    register(client)
+
+    client.post("/expenses/add", data=valid_form(description="  Lunch with team  "))
+
+    assert expense_rows()[0]["description"] == "Lunch with team"
+
+
+def test_past_date_is_accepted(client):
+    register(client)
+    last_year = (date.today() - timedelta(days=365)).isoformat()
+
+    resp = client.post("/expenses/add", data=valid_form(date=last_year))
+
+    assert resp.status_code == 302
+    assert expense_rows()[0]["date"] == last_year
+
+
+@pytest.mark.parametrize("category", ["food", "FOOD", "Foods"])
+def test_category_must_match_the_list_exactly(client, category):
+    register(client)
+
+    resp = client.post("/expenses/add", data=valid_form(category=category))
+
+    assert resp.status_code == 200
+    assert "Please choose a category." in resp.get_data(as_text=True)
+    assert expense_rows() == []
+
+
+@pytest.mark.parametrize("category", ["Food", "Transport", "Bills", "Health", "Entertainment", "Shopping", "Other"])
+def test_every_listed_category_is_accepted(client, category):
+    register(client)
+
+    resp = client.post("/expenses/add", data=valid_form(category=category))
+
+    assert resp.status_code == 302
+    assert expense_rows()[0]["category"] == category
+
+
+def test_all_submitted_values_are_kept_after_an_error(client):
+    register(client)
+    past = (date.today() - timedelta(days=3)).isoformat()
+
+    resp = client.post(
+        "/expenses/add",
+        data={"amount": "12.345", "category": "Health", "date": past, "description": "Pharmacy"},
+    )
+    body = resp.get_data(as_text=True)
+
+    assert "at most 2 decimal places" in body
+    assert 'value="12.345"' in body
+    assert '<option value="Health" selected>' in body
+    assert f'value="{past}"' in body
+    assert 'value="Pharmacy"' in body
+
+
+def test_date_input_max_allows_one_day_for_timezones(client):
+    register(client)
+
+    body = client.get("/expenses/add").get_data(as_text=True)
+
+    assert f'max="{(date.today() + timedelta(days=1)).isoformat()}"' in body
+
+
+def test_servers_tomorrow_is_accepted_for_users_ahead_of_the_server(client):
+    register(client)
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+
+    resp = client.post("/expenses/add", data=valid_form(date=tomorrow))
+
+    assert resp.status_code == 302
+    assert expense_rows()[0]["date"] == tomorrow
+
+
+def test_fresh_form_defaults_to_the_browsers_today(client):
+    register(client)
+
+    body = client.get("/expenses/add").get_data(as_text=True)
+
+    assert "data-default-to-local-today" in date_input(body)
+
+
+def test_form_after_an_error_keeps_the_entered_date(client):
+    register(client)
+    past = (date.today() - timedelta(days=10)).isoformat()
+
+    body = client.post("/expenses/add", data=valid_form(amount="0", date=past)).get_data(as_text=True)
+
+    assert "data-default-to-local-today" not in date_input(body)
+    assert f'value="{past}"' in date_input(body)
+
+
+def test_success_message_is_shown_only_once(client):
+    register(client)
+    client.post("/expenses/add", data=valid_form())
+
+    assert "Expense added." in client.get("/profile").get_data(as_text=True)
+    assert "Expense added." not in client.get("/profile").get_data(as_text=True)
+
+
+def test_nav_shows_add_expense_link_only_when_signed_in(client):
+    assert 'href="/expenses/add"' not in client.get("/").get_data(as_text=True)
+
+    register(client)
+
+    assert 'href="/expenses/add"' in client.get("/").get_data(as_text=True)
+
+
+def test_profile_has_add_expense_button(client):
+    register(client)
+
+    body = client.get("/profile").get_data(as_text=True)
+
+    assert 'href="/expenses/add" class="btn-primary"' in body

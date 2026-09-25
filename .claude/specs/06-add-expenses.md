@@ -12,7 +12,7 @@ Let a signed-in Spendly user record a new expense (amount, category, date, optio
 
 1. **Where to redirect after a successful add.** On `main`, `/profile` only shows name and email — the expense summary/list lives on the unmerged branches `feature/profile-page-design` and `feature/profile-page-date-filter`. This spec redirects to `/profile` with a flash message ("Expense added.") so the feature works on `main` today. Once the profile expense list is merged, the new expense will show up there with no further change to this route.
 2. **Fixed category list.** Categories are a fixed set matching the existing seed data: `Food`, `Transport`, `Bills`, `Health`, `Entertainment`, `Shopping`, `Other`. No user-defined categories in this step.
-3. **Future dates are rejected.** An expense records money already spent, so `date` must be today or earlier. (Easy to relax if you want to allow planned expenses.)
+3. **Future dates are rejected.** An expense records money already spent, so `date` must be the user's today or earlier. The server can't know the user's timezone, so it allows up to one day past its own date. The browser limits the date field to the user's own today. (Changed after code review: using only the server's date blocked users ahead of it, e.g. in India on a UTC server, from logging today's expenses between 00:00 and 05:30.)
 4. **Flash messages.** The app does not use `flash()` yet. This spec adds a small flash-message block to `base.html` so the success message can be shown on any page.
 5. **Amount limits.** Amount must be `> 0` and `<= 10,000,000`, with at most 2 decimal places.
 
@@ -27,7 +27,7 @@ Let a signed-in Spendly user record a new expense (amount, category, date, optio
 - **Data validation (enforced in the app, before the INSERT):**
   - `amount`: required, numeric, `> 0`, `<= 10,000,000`, at most 2 decimal places. Stored rounded to 2 decimals.
   - `category`: required, must be one of the fixed categories.
-  - `date`: required, valid `YYYY-MM-DD`, not in the future.
+  - `date`: required, valid `YYYY-MM-DD`, and no later than the server's today plus one day (see assumption 3).
   - `description`: optional, trimmed, max 200 characters. An empty string is stored as `NULL`.
   - `user_id`: always taken from `session["user_id"]`, never from form input.
 
@@ -37,7 +37,7 @@ Let a signed-in Spendly user record a new expense (amount, category, date, optio
   - Header: "Add an expense" / "Record what you spent".
   - `amount`: `<input type="number" step="0.01" min="0.01" required>`
   - `category`: `<select required>` with the fixed categories and a disabled "Choose a category" placeholder.
-  - `date`: `<input type="date" required>`, defaulting to today, with `max` set to today.
+  - `date`: `<input type="date" required>`. The server sets `max` to its today plus one day. A small script then sets `max` to the browser's own today and, on a fresh form, the default value too. After an error, the value the user entered is kept.
   - `description`: `<input type="text" maxlength="200">`, optional.
   - Submit button: "Add expense". A secondary "Cancel" link goes back to `/profile`.
   - On a validation error, show the error in the existing `.auth-error` box and re-fill all submitted values.
@@ -91,7 +91,7 @@ Let a signed-in Spendly user record a new expense (amount, category, date, optio
 - Rejected, with no row inserted and values re-filled:
   - amount missing, `0`, negative, non-numeric, `nan`, more than 2 decimals, or over the limit
   - a category not in the list
-  - a date that is missing, malformed, or in the future
+  - a date that is missing, malformed, or more than one day past the server's today (the server's tomorrow is accepted)
   - a description longer than 200 characters
 - A `user_id` field in the POST body is ignored; the row belongs to the session user.
 - A session pointing at a deleted user is sent to `/login` instead of getting a 500 error.

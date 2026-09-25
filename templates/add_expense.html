@@ -38,8 +38,9 @@
                 <div class="form-group">
                     <label for="date">Date</label>
                     <input type="date" id="date" name="date"
-                           class="form-input" max="{{ today }}"
+                           class="form-input" max="{{ latest_date }}"
                            value="{{ form.get('date', '') }}"
+                           {% if fresh_form %}data-default-to-local-today{% endif %}
                            required>
                 </div>
                 <div class="form-group">
@@ -60,4 +61,25 @@
     </div>
 </section>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // The server can't know the user's timezone, so use the browser's own "today"
+    // for the latest selectable date and, on a fresh form, for the default date.
+    (function () {
+        var input = document.getElementById("date");
+        var now = new Date();
+        var localToday = [
+            now.getFullYear(),
+            String(now.getMonth() + 1).padStart(2, "0"),
+            String(now.getDate()).padStart(2, "0"),
+        ].join("-");
+
+        input.max = localToday;
+        if (input.hasAttribute("data-default-to-local-today")) {
+            input.value = localToday;
+        }
+    })();
+</script>
 {% endblock %}

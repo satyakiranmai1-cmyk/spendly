@@ -1,7 +1,7 @@
 import os
 import re
 import sqlite3
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from functools import wraps
 
@@ -45,6 +45,16 @@ def login_required(view_func):
     return wrapped_view
 
 
+def latest_expense_date():
+    """Latest date an expense may have: the server's today plus one day.
+
+    "Today" depends on the user's timezone, which the server doesn't know. Allowing
+    one extra day means a user ahead of the server can still log today's expenses.
+    The form itself limits the date to the user's own today in the browser.
+    """
+    return date.today() + timedelta(days=1)
+
+
 def _validate_expense_form(form):
     """Return (cleaned_data, error) for a submitted expense form; error is None when valid."""
     raw_amount = form.get("amount", "").strip()
@@ -74,7 +84,7 @@ def _validate_expense_form(form):
         return None, "Please choose a category."
     if expense_date is None:
         return None, "Please enter a valid date."
-    if expense_date > date.today():
+    if expense_date > latest_expense_date():
         return None, "Date can't be in the future."
     if len(description) > MAX_DESCRIPTION_LENGTH:
         return None, f"Description must be {MAX_DESCRIPTION_LENGTH} characters or fewer."
@@ -184,14 +194,18 @@ def profile():
 @app.route("/expenses/add", methods=["GET", "POST"])
 @login_required
 def add_expense():
-    today = date.today().isoformat()
+    latest_date = latest_expense_date().isoformat()
 
     if request.method == "GET":
         if get_user_by_id(session["user_id"]) is None:
             session.pop("user_id", None)
             return redirect(url_for("login"))
         return render_template(
-            "add_expense.html", categories=EXPENSE_CATEGORIES, today=today, form={"date": today}
+            "add_expense.html",
+            categories=EXPENSE_CATEGORIES,
+            latest_date=latest_date,
+            form={"date": date.today().isoformat()},
+            fresh_form=True,
         )
 
     expense, error = _validate_expense_form(request.form)
@@ -199,7 +213,7 @@ def add_expense():
         return render_template(
             "add_expense.html",
             categories=EXPENSE_CATEGORIES,
-            today=today,
+            latest_date=latest_date,
             form=request.form,
             error=error,
         )
