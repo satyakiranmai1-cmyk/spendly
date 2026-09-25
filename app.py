@@ -13,6 +13,7 @@ from database.db import (
     create_user,
     get_db,
     get_expense_summary_by_user,
+    get_expenses_by_day,
     get_user_by_email,
     get_user_by_id,
     init_db,
@@ -171,7 +172,13 @@ def profile():
         session.pop("user_id", None)
         return redirect(url_for("login"))
     summary = get_expense_summary_by_user(user["id"])
-    return render_template("profile.html", user=user, summary=summary)
+    days = get_expenses_by_day(user["id"])
+    for day in days:
+        try:
+            day["display_date"] = date.fromisoformat(day["date"]).strftime("%A, %B %d, %Y")
+        except ValueError:
+            day["display_date"] = day["date"]
+    return render_template("profile.html", user=user, summary=summary, days=days)
 
 
 @app.route("/expenses/add", methods=["GET", "POST"])

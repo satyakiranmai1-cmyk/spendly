@@ -513,6 +513,101 @@ select.form-input {
 }
 
 /* ------------------------------------------------------------------ */
+/* Day-wise transactions                                               */
+/* ------------------------------------------------------------------ */
+
+.transactions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 0.5rem 0 1.25rem;
+}
+
+.transactions-title {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 400;
+    color: var(--ink);
+}
+
+.statement-day { margin-bottom: 1.5rem; }
+
+.statement-day-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 0 0.25rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 0.25rem;
+}
+
+.statement-date {
+    font-weight: 500;
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+}
+
+.statement-day-total {
+    font-weight: 600;
+    color: var(--ink);
+}
+
+.statement-list {
+    list-style: none;
+    background: var(--paper-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.statement-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.85rem 1.25rem;
+}
+
+.statement-row + .statement-row { border-top: 1px solid var(--border-soft); }
+
+.statement-row-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+}
+
+.statement-category {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--ink);
+}
+
+.statement-desc {
+    font-size: 0.8rem;
+    color: var(--ink-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.statement-amount {
+    flex-shrink: 0;
+    font-weight: 500;
+    color: var(--ink);
+}
+
+.statement-empty {
+    background: var(--paper-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 2.5rem;
+    text-align: center;
+    color: var(--ink-muted);
+}
+
+/* ------------------------------------------------------------------ */
 /* Flash messages                                                      */
 /* ------------------------------------------------------------------ */
 

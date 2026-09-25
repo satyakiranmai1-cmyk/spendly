@@ -103,6 +103,28 @@ def test_profile_totals_include_added_expenses(client):
     assert b'mock-total">2</span>' in resp.data
 
 
+def test_profile_lists_expenses_grouped_by_day_newest_first(client):
+    register(client)
+    today = date.today()
+    yesterday = today - timedelta(days=1)
+    client.post("/expenses/add", data=valid_form(amount="10", date=yesterday.isoformat(), description="Old one"))
+    client.post("/expenses/add", data=valid_form(amount="4.50", date=today.isoformat(), description="Coffee"))
+    client.post("/expenses/add", data=valid_form(amount="5.50", date=today.isoformat(), description="Bus", category="Transport"))
+
+    body = client.get("/profile").get_data(as_text=True)
+
+    today_label = today.strftime("%A, %B %d, %Y")
+    yesterday_label = yesterday.strftime("%A, %B %d, %Y")
+    assert body.index(today_label) < body.index(yesterday_label)
+    assert body.index("Bus") < body.index("Coffee") < body.index("Old one")
+    assert 'statement-day-total">$10.00' in body  # today's 4.50 + 5.50, and yesterday's 10
+
+
+def test_profile_shows_empty_state_without_expenses(client):
+    register(client)
+    assert b"No expenses logged yet." in client.get("/profile").data
+
+
 def test_profile_totals_only_count_own_expenses(client):
     register(client, email="other@example.com")
     client.post("/expenses/add", data=valid_form(amount="100"))
