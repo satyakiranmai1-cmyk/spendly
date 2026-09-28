@@ -146,6 +146,38 @@ def create_expense(user_id, amount, category, date, description=None):
         conn.close()
 
 
+def get_expense_for_user(expense_id, user_id):
+    conn = get_db()
+    row = conn.execute(
+        """
+        SELECT id, amount, category, description, date
+        FROM expenses
+        WHERE id = ? AND user_id = ?
+        """,
+        (expense_id, user_id),
+    ).fetchone()
+    conn.close()
+    return row
+
+
+def update_expense(expense_id, user_id, amount, category, date, description=None):
+    """Update one of the user's expenses; return the number of rows changed (0 or 1)."""
+    conn = get_db()
+    try:
+        cursor = conn.execute(
+            """
+            UPDATE expenses
+            SET amount = ?, category = ?, description = ?, date = ?
+            WHERE id = ? AND user_id = ?
+            """,
+            (amount, category, description, date, expense_id, user_id),
+        )
+        conn.commit()
+        return cursor.rowcount
+    finally:
+        conn.close()
+
+
 def seed_db():
     conn = get_db()
 
