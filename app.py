@@ -5,19 +5,21 @@ from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 from functools import wraps
 
-from flask import Flask, flash, redirect, render_template, request, session, url_for
+from flask import Flask, abort, flash, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from database.db import (
     create_expense,
     create_user,
     get_db,
+    get_expense_for_user,
     get_expense_summary_by_user,
     get_expenses_by_day,
     get_user_by_email,
     get_user_by_id,
     init_db,
     seed_db,
+    update_expense,
 )
 
 app = Flask(__name__)
@@ -95,6 +97,16 @@ def _validate_expense_form(form):
         "date": expense_date.isoformat(),
         "description": description or None,
     }, None
+
+
+def _render_expense_form(**context):
+    """Render the shared add/edit expense form with the values both pages need."""
+    return render_template(
+        "expense_form.html",
+        categories=EXPENSE_CATEGORIES,
+        latest_date=latest_expense_date().isoformat(),
+        **context,
+    )
 
 # ------------------------------------------------------------------ #
 # Routs                                                              #
@@ -194,29 +206,25 @@ def profile():
 @app.route("/expenses/add", methods=["GET", "POST"])
 @login_required
 def add_expense():
-    latest_date = latest_expense_date().isoformat()
+    page = {
+        "page_title": "Add expense",
+        "heading": "Add an expense",
+        "subtitle": "Record what you spent",
+        "form_action": url_for("add_expense"),
+        "submit_label": "Add expense",
+    }
 
     if request.method == "GET":
         if get_user_by_id(session["user_id"]) is None:
             session.pop("user_id", None)
             return redirect(url_for("login"))
-        return render_template(
-            "add_expense.html",
-            categories=EXPENSE_CATEGORIES,
-            latest_date=latest_date,
-            form={"date": date.today().isoformat()},
-            fresh_form=True,
+        return _render_expense_form(
+            form={"date": date.today().isoformat()}, fresh_form=True, **page
         )
 
     expense, error = _validate_expense_form(request.form)
     if error:
-        return render_template(
-            "add_expense.html",
-            categories=EXPENSE_CATEGORIES,
-            latest_date=latest_date,
-            form=request.form,
-            error=error,
-        )
+        return _render_expense_form(form=request.form, error=error, **page)
 
     try:
         create_expense(session["user_id"], **expense)
@@ -228,9 +236,41 @@ def add_expense():
     return redirect(url_for("profile"))
 
 
-@app.route("/expenses/<int:id>/edit")
+@app.route("/expenses/<int:id>/edit", methods=["GET", "POST"])
+@login_required
 def edit_expense(id):
-    return "Edit expense — coming in Step 8" 
+    # Filtering on the session user means another user's expense looks the same
+    # as a missing one (404), so expense IDs can't be probed.
+    expense = get_expense_for_user(id, session["user_id"])
+    if expense is None:
+        abort(404)
+
+    page = {
+        "page_title": "Edit expense",
+        "heading": "Edit expense",
+        "subtitle": "Update the details",
+        "form_action": url_for("edit_expense", id=id),
+        "submit_label": "Save changes",
+    }
+
+    if request.method == "GET":
+        form = {
+            "amount": f"{expense['amount']:.2f}",
+            "category": expense["category"],
+            "date": expense["date"],
+            "description": expense["description"] or "",
+        }
+        return _render_expense_form(form=form, **page)
+
+    updated, error = _validate_expense_form(request.form)
+    if error:
+        return _render_expense_form(form=request.form, error=error, **page)
+
+    if update_expense(id, session["user_id"], **updated) == 0:
+        abort(404)
+
+    flash("Expense updated.", "success")
+    return redirect(url_for("profile"))
 
 
 @app.route("/expenses/<int:id>/delete")
